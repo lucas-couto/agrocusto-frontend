@@ -1,6 +1,7 @@
 'use client';
 
-import { Calendar, LogOut } from 'lucide-react';
+import Link from 'next/link';
+import { Calendar, Info, LogOut } from 'lucide-react';
 import { signOut } from '@/app/actions/auth';
 import type { Fazenda } from '@/types';
 
@@ -56,6 +57,13 @@ export function UserFooter({
             ))}
           </select>
         </div>
+        <Link
+          href={activeFazendaId ? `/fazenda/${activeFazendaId}` : '#'}
+          aria-label="Detalhes da fazenda"
+          className="p-2 rounded-lg text-slate-400 hover:text-agro-green hover:bg-agro-green/5 transition-colors"
+        >
+          <Info size={18} />
+        </Link>
         <form action={signOut}>
           <button
             type="submit"

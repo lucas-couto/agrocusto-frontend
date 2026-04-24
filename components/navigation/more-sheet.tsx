@@ -1,5 +1,7 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
+import { Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/lib/utils';
 import { NAV_ITEMS } from './nav-config';
@@ -34,6 +36,8 @@ export function MoreSheet({
   onShowSubscription,
   userName,
 }: MoreSheetProps) {
+  const router = useRouter();
+
   const moreItems = NAV_ITEMS.filter((item) =>
     item.surfaces.includes('more'),
   );
@@ -41,6 +45,13 @@ export function MoreSheet({
   const handleItemClick = (tab: NavTab) => {
     onTabChange(tab);
     onClose();
+  };
+
+  const handleFazendaDetail = () => {
+    if (activeFazendaId) {
+      router.push(`/fazenda/${activeFazendaId}`);
+      onClose();
+    }
   };
 
   return (
@@ -91,6 +102,15 @@ export function MoreSheet({
                   </button>
                 );
               })}
+              {activeFazendaId && (
+                <button
+                  onClick={handleFazendaDetail}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-slate-500 hover:bg-slate-50"
+                >
+                  <Info size={20} />
+                  <span className="font-medium">Detalhes da Fazenda</span>
+                </button>
+              )}
             </nav>
 
             {/* User footer */}
