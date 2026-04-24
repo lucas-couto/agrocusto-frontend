@@ -48,6 +48,7 @@ export interface SubscriptionPlan {
 export interface Lancamento {
   id: string;
   usuario_id: string;
+  fazenda_id: string;
   talhao_id: string | null; // null means "Fazenda Toda"
   categoria: string;
   valor_total: number;

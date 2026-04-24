@@ -275,23 +275,29 @@ export default function App() {
     // Handle multiple talhoes division
     if (aiResult?.talhao_ids?.length > 1) {
       const dividedValue = value / aiResult.talhao_ids.length;
-      const rows = aiResult.talhao_ids.map((tid: string, index: number) => ({
-        usuario_id: userId,
-        talhao_id: tid,
-        valor_total: dividedValue,
-        categoria,
-        data_gasto: dataGasto,
-        descricao: `${launchDesc} (Rateio ${index + 1}/${aiResult.talhao_ids.length})`,
-        cultura: launchCultura || 'Geral',
-        safra: launchSafra,
-      }));
+      const rows = aiResult.talhao_ids.map((tid: string, index: number) => {
+        const talhao = talhoes.find((t) => t.id === tid);
+        return {
+          usuario_id: userId,
+          fazenda_id: talhao?.fazenda_id ?? activeFazendaId,
+          talhao_id: tid,
+          valor_total: dividedValue,
+          categoria,
+          data_gasto: dataGasto,
+          descricao: `${launchDesc} (Rateio ${index + 1}/${aiResult.talhao_ids.length})`,
+          cultura: launchCultura || 'Geral',
+          safra: launchSafra,
+        };
+      });
 
       const { data, error } = await supabase.from('lancamentos').insert(rows).select();
       if (error) { alert('Erro ao salvar lancamentos: ' + error.message); return; }
       if (data) setTransactions([...data, ...transactions]);
     } else {
+      const talhao = launchTalhaoId ? talhoes.find((t) => t.id === launchTalhaoId) : null;
       const row = {
         usuario_id: userId,
+        fazenda_id: talhao?.fazenda_id ?? activeFazendaId,
         talhao_id: launchTalhaoId,
         valor_total: value,
         categoria,
@@ -681,7 +687,7 @@ export default function App() {
                 <Card>
                   <h3 className="text-lg font-bold mb-4">Últimos Lançamentos</h3>
                   <div className="space-y-4">
-                    {transactions.slice(0, 5).map((item) => (
+                    {transactions.filter((t) => t.fazenda_id === activeFazendaId).slice(0, 5).map((item) => (
                       <div key={item.id} className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100">
                         <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 shrink-0">
                           {categoriaToLabel(item.categoria as CategoriaLancamento)[0]}
@@ -1152,7 +1158,7 @@ export default function App() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {transactions.map((item) => (
+                      {transactions.filter((t) => t.fazenda_id === activeFazendaId).map((item) => (
                         <tr key={item.id} className="hover:bg-slate-50 transition-colors">
                           <td className="px-6 py-4 text-sm text-slate-600">{item.data_gasto}</td>
                           <td className="px-6 py-4 text-sm font-bold text-slate-900">{item.descricao}</td>

@@ -350,17 +350,14 @@ export default function FazendaDetailPage({
       );
       setTalhoes(fazendaTalhoes);
 
-      // Fetch recent lancamentos for this fazenda's talhoes
-      const talhaoIds = fazendaTalhoes.map((t) => t.id);
-      if (talhaoIds.length > 0) {
-        const lancRes = await supabase
-          .from('lancamentos')
-          .select('*')
-          .in('talhao_id', talhaoIds)
-          .order('data_gasto', { ascending: false })
-          .limit(10);
-        setRecentLancamentos((lancRes.data ?? []) as Lancamento[]);
-      }
+      // Recent lancamentos for this fazenda (picks up "Fazenda Toda" launches too)
+      const lancRes = await supabase
+        .from('lancamentos')
+        .select('*')
+        .eq('fazenda_id', currentFazenda.id)
+        .order('data_gasto', { ascending: false })
+        .limit(10);
+      setRecentLancamentos((lancRes.data ?? []) as Lancamento[]);
 
       setIsLoading(false);
     }
@@ -372,11 +369,11 @@ export default function FazendaDetailPage({
   const talhoesCount = talhoes.length;
 
   const costSafra = useMemo(() => {
-    const talhaoIds = new Set(talhoes.map((t) => t.id));
+    if (!fazenda) return 0;
     return allLancamentos
-      .filter((l) => l.talhao_id && talhaoIds.has(l.talhao_id))
+      .filter((l) => l.fazenda_id === fazenda.id)
       .reduce((acc, l) => acc + l.valor_total, 0);
-  }, [talhoes, allLancamentos]);
+  }, [fazenda, allLancamentos]);
 
   const estimatedRevenue = useMemo(() => {
     return talhoes.reduce((acc, t) => acc + t.area_ha * 2500, 0);
@@ -404,11 +401,9 @@ export default function FazendaDetailPage({
 
   // lancamentos count for delete warning
   const fazendaLancamentosCount = useMemo(() => {
-    const talhaoIds = new Set(talhoes.map((t) => t.id));
-    return allLancamentos.filter(
-      (l) => l.talhao_id && talhaoIds.has(l.talhao_id),
-    ).length;
-  }, [talhoes, allLancamentos]);
+    if (!fazenda) return 0;
+    return allLancamentos.filter((l) => l.fazenda_id === fazenda.id).length;
+  }, [fazenda, allLancamentos]);
 
   // ---------- inline edit handlers ----------
   async function handleUpdateField(field: keyof Fazenda, rawValue: string) {

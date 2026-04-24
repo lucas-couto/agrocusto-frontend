@@ -109,6 +109,7 @@ export type Database = {
         Row: {
           id: string;
           usuario_id: string;
+          fazenda_id: string;
           talhao_id: string | null;
           categoria: Database['public']['Enums']['categoria_lancamento'];
           valor_total: number;
@@ -121,6 +122,7 @@ export type Database = {
         Insert: {
           id?: string;
           usuario_id: string;
+          fazenda_id: string;
           talhao_id?: string | null;
           categoria: Database['public']['Enums']['categoria_lancamento'];
           valor_total: number;
@@ -133,6 +135,7 @@ export type Database = {
         Update: {
           id?: string;
           usuario_id?: string;
+          fazenda_id?: string;
           talhao_id?: string | null;
           categoria?: Database['public']['Enums']['categoria_lancamento'];
           valor_total?: number;
