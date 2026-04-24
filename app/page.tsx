@@ -318,7 +318,13 @@ export default function App() {
     setActiveTab('dashboard');
   };
 
-  const handleCreateField = async (nome: string, area: number, cultura: string) => {
+  const handleCreateField = async (
+    nome: string,
+    area: number,
+    cultura: string,
+    safra: string,
+    dataPlantio: string | null,
+  ) => {
     // Convert to hectares if input was in alqueires
     const areaHa = areaUnit === 'ha' ? area : area * 2.42;
 
@@ -344,7 +350,8 @@ export default function App() {
         nome,
         area_ha: areaHa,
         cultura,
-        safra: '24/25',
+        safra,
+        data_plantio: dataPlantio,
       })
       .select()
       .single();
@@ -412,6 +419,7 @@ export default function App() {
         nome: editingTalhao.nome,
         area_ha: editingTalhao.area_ha,
         cultura: editingTalhao.cultura,
+        data_plantio: editingTalhao.data_plantio,
         safra: editingTalhao.safra,
       })
       .eq('id', editingTalhao.id)
@@ -422,6 +430,34 @@ export default function App() {
     if (data) setTalhoes(talhoes.map(t => t.id === data.id ? data : t));
     setEditingTalhao(null);
     alert('Talhao atualizado com sucesso!');
+  };
+
+  const handleDeleteTalhao = async () => {
+    if (!editingTalhao) return;
+
+    const linkedLancamentos = transactions.filter(l => l.talhao_id === editingTalhao.id).length;
+    const warning = linkedLancamentos > 0
+      ? `\n\n${linkedLancamentos} lancamento(s) ligado(s) a esse talhao serao marcados como "Fazenda Toda".`
+      : '';
+    const confirmed = window.confirm(
+      `Deletar o talhao "${editingTalhao.nome}" permanentemente?${warning}`,
+    );
+    if (!confirmed) return;
+
+    const { error } = await supabase
+      .from('talhoes')
+      .delete()
+      .eq('id', editingTalhao.id);
+
+    if (error) { alert('Erro ao deletar talhao: ' + error.message); return; }
+
+    setTalhoes(talhoes.filter(t => t.id !== editingTalhao.id));
+    // FK on_delete set null: refetch to reflect the mutation on lancamentos
+    setTransactions(transactions.map(l =>
+      l.talhao_id === editingTalhao.id ? { ...l, talhao_id: null } : l
+    ));
+    setEditingTalhao(null);
+    alert('Talhao deletado com sucesso!');
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1555,34 +1591,53 @@ export default function App() {
                     />
                   </div>
                 </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-400 uppercase">Safra</label>
-                  <select 
-                    value={editingTalhao.safra}
-                    onChange={(e) => setEditingTalhao({...editingTalhao, safra: e.target.value})}
-                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-agro-green"
-                  >
-                    <option value="23/24">23/24</option>
-                    <option value="24/25">24/25</option>
-                    <option value="25/26">25/26</option>
-                  </select>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-bold text-slate-400 uppercase">Safra</label>
+                    <select
+                      value={editingTalhao.safra}
+                      onChange={(e) => setEditingTalhao({...editingTalhao, safra: e.target.value})}
+                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-agro-green"
+                    >
+                      <option value="23/24">23/24</option>
+                      <option value="24/25">24/25</option>
+                      <option value="25/26">25/26</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-400 uppercase">Data de Plantio</label>
+                    <input
+                      type="date"
+                      value={editingTalhao.data_plantio ?? ''}
+                      onChange={(e) => setEditingTalhao({...editingTalhao, data_plantio: e.target.value || null})}
+                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-agro-green"
+                    />
+                  </div>
                 </div>
 
                 <div className="flex gap-3 pt-4">
-                  <button 
+                  <button
                     type="button"
                     onClick={() => setEditingTalhao(null)}
                     className="flex-1 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold text-sm"
                   >
                     CANCELAR
                   </button>
-                  <button 
+                  <button
                     type="submit"
                     className="flex-1 py-3 bg-agro-green text-white rounded-xl font-bold text-sm shadow-lg shadow-agro-green/20"
                   >
                     SALVAR
                   </button>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={handleDeleteTalhao}
+                  className="w-full py-3 mt-2 bg-white border border-red-200 text-red-600 rounded-xl font-bold text-sm hover:bg-red-50 transition-colors"
+                >
+                  DELETAR TALHÃO
+                </button>
               </form>
             </motion.div>
           </div>
@@ -1606,55 +1661,90 @@ export default function App() {
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
               className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md p-8"
             >
-              <h3 className="text-2xl font-bold text-slate-900 mb-2">Novo Talhão Detectado</h3>
-              <p className="text-slate-500 mb-6">A IA identificou o "{aiResult?.talhao_nome}", mas ele ainda não existe. Deseja cadastrá-lo agora?</p>
-              
+              <h3 className="text-2xl font-bold text-slate-900 mb-2">
+                {aiResult?.talhao_nome ? 'Novo Talhão Detectado' : 'Novo Talhão'}
+              </h3>
+              <p className="text-slate-500 mb-6">
+                {aiResult?.talhao_nome
+                  ? `A IA identificou o "${aiResult.talhao_nome}", mas ele ainda não existe. Deseja cadastrá-lo agora?`
+                  : 'Cadastre um novo talhão nesta fazenda.'}
+              </p>
+
               <div className="space-y-4 mb-8">
                 <div>
                   <label className="text-xs font-bold text-slate-400 uppercase">Nome do Talhão</label>
-                  <input 
-                    type="text" 
-                    defaultValue={aiResult?.talhao_nome}
+                  <input
+                    type="text"
+                    defaultValue={aiResult?.talhao_nome ?? ''}
                     id="new-field-name"
                     className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-agro-green"
                   />
                 </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-xs font-bold text-slate-400 uppercase">Área ({areaUnit === 'ha' ? 'ha' : 'alq'})</label>
-                        <input 
-                          type="number" 
-                          placeholder={areaUnit === 'ha' ? "Ex: 50" : "Ex: 20"}
-                          id="new-field-area"
-                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-agro-green"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs font-bold text-slate-400 uppercase">Cultura</label>
-                        <input 
-                          type="text" 
-                          defaultValue={aiResult?.cultura || ""}
-                          placeholder="Ex: Soja"
-                          id="new-field-cultura"
-                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-agro-green"
-                        />
-                      </div>
-                    </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-bold text-slate-400 uppercase">Área ({areaUnit === 'ha' ? 'ha' : 'alq'})</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder={areaUnit === 'ha' ? 'Ex: 50' : 'Ex: 20'}
+                      id="new-field-area"
+                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-agro-green"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-400 uppercase">Cultura</label>
+                    <input
+                      type="text"
+                      defaultValue={aiResult?.cultura || ''}
+                      placeholder="Ex: Soja"
+                      id="new-field-cultura"
+                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-agro-green"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-bold text-slate-400 uppercase">Safra</label>
+                    <select
+                      defaultValue="24/25"
+                      id="new-field-safra"
+                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-agro-green"
+                    >
+                      <option value="23/24">23/24</option>
+                      <option value="24/25">24/25</option>
+                      <option value="25/26">25/26</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-400 uppercase">Data de Plantio</label>
+                    <input
+                      type="date"
+                      id="new-field-data-plantio"
+                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-agro-green"
+                    />
+                  </div>
+                </div>
               </div>
 
               <div className="flex gap-3">
-                <button 
+                <button
                   onClick={() => setShowCreateFieldModal(false)}
                   className="flex-1 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold text-sm"
                 >
                   CANCELAR
                 </button>
-                <button 
+                <button
                   onClick={() => {
                     const name = (document.getElementById('new-field-name') as HTMLInputElement).value;
                     const area = parseFloat((document.getElementById('new-field-area') as HTMLInputElement).value);
                     const cultura = (document.getElementById('new-field-cultura') as HTMLInputElement).value;
-                    handleCreateField(name, area, cultura);
+                    const safra = (document.getElementById('new-field-safra') as HTMLSelectElement).value;
+                    const dataPlantioRaw = (document.getElementById('new-field-data-plantio') as HTMLInputElement).value;
+                    if (!name || isNaN(area) || area <= 0 || !cultura) {
+                      alert('Preencha nome, área (> 0) e cultura.');
+                      return;
+                    }
+                    handleCreateField(name, area, cultura, safra, dataPlantioRaw || null);
                   }}
                   className="flex-1 py-3 bg-agro-green text-white rounded-xl font-bold text-sm shadow-lg shadow-agro-green/20"
                 >
