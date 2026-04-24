@@ -2,22 +2,16 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  LayoutDashboard,
-  PlusCircle, 
-  Layers, 
-  TrendingUp, 
-  Wallet, 
+  PlusCircle,
+  TrendingUp,
+  Wallet,
   Target,
-  Menu,
   X,
   ChevronRight,
   ArrowUpRight,
   ArrowDownRight,
   DollarSign,
   MapPin,
-  Calendar,
-  User,
-  LogOut,
   BarChart3,
   MessageSquare,
   Mic,
@@ -45,6 +39,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/lib/utils';
 import { Lancamento, Talhao, Quote, AIResponse, SubscriptionPlan, Fazenda } from '@/types';
+import { Sidebar, BottomNav, MoreSheet } from '@/components/navigation';
 
 // --- Mock Data ---
 const MOCK_FAZENDAS: Fazenda[] = [
@@ -140,15 +135,7 @@ export default function App() {
   const [selectedReportTalhao, setSelectedReportTalhao] = useState<number | null>(null);
   const [editingTalhao, setEditingTalhao] = useState<Talhao | null>(null);
   const [areaUnit, setAreaUnit] = useState<'ha' | 'alqueire'>('ha');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isDesktop, setIsDesktop] = useState(false);
-
-  useEffect(() => {
-    const check = () => setIsDesktop(window.innerWidth >= 768);
-    check();
-    window.addEventListener('resize', check);
-    return () => window.removeEventListener('resize', check);
-  }, []);
+  const [isMoreSheetOpen, setIsMoreSheetOpen] = useState(false);
 
   const formatArea = (ha: number) => {
     const val = areaUnit === 'ha' ? ha : ha / 2.42;
@@ -373,127 +360,52 @@ export default function App() {
   return (
     <div className="min-h-screen bg-agro-bg flex flex-col md:flex-row">
       {/* Mobile Header */}
-      <header className="md:hidden bg-agro-green text-white p-4 flex justify-between items-center sticky top-0 z-50 shadow-md">
+      <header className="md:hidden bg-agro-green text-white p-4 flex items-center sticky top-0 z-50 shadow-md">
         <div className="flex items-center gap-2">
           <div className="bg-white p-1.5 rounded-lg">
             <TrendingUp size={20} className="text-agro-green" />
           </div>
           <h1 className="font-display font-bold text-xl tracking-tight">AgroCusto</h1>
         </div>
-        <button onClick={() => setIsSidebarOpen(true)}>
-          <Menu size={24} />
-        </button>
       </header>
 
-      {/* Sidebar / Navigation */}
-      <AnimatePresence>
-        {(isSidebarOpen || isDesktop) && (
-          <motion.aside 
-            initial={{ x: -300 }}
-            animate={{ x: 0 }}
-            exit={{ x: -300 }}
-            className={cn(
-              "fixed md:relative z-50 w-72 h-full bg-white border-r border-slate-200 flex flex-col transition-all duration-300",
-              !isSidebarOpen && "hidden md:flex"
-            )}
-          >
-            <div className="p-6 flex justify-between items-center">
-              <div className="flex items-center gap-3">
-                <div className="bg-agro-green p-2 rounded-xl">
-                  <TrendingUp size={24} className="text-white" />
-                </div>
-                <h1 className="font-display font-bold text-2xl text-agro-green tracking-tight">AgroCusto</h1>
-              </div>
-              <button className="md:hidden" onClick={() => setIsSidebarOpen(false)}>
-                <X size={24} className="text-slate-400" />
-              </button>
-            </div>
+      {/* Desktop Sidebar */}
+      <Sidebar
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        fazendas={fazendas}
+        activeFazendaId={activeFazendaId}
+        onFazendaChange={setActiveFazendaId}
+        isTrial={isTrial}
+        daysLeft={daysLeft}
+        onShowSubscription={() => setShowSubscription(true)}
+        userName="João Produtor"
+      />
 
-            <nav className="flex-1 px-4 py-4 space-y-2">
-              <button 
-                onClick={() => { setActiveTab('dashboard'); setIsSidebarOpen(false); }}
-                className={cn(
-                  "w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all",
-                  activeTab === 'dashboard' ? "bg-agro-green text-white shadow-lg shadow-agro-green/20" : "text-slate-500 hover:bg-slate-50"
-                )}
-              >
-                <LayoutDashboard size={20} />
-                <span className="font-medium">Dashboard</span>
-              </button>
-              <button 
-                onClick={() => { setActiveTab('launch'); setIsSidebarOpen(false); }}
-                className={cn(
-                  "w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all",
-                  activeTab === 'launch' ? "bg-agro-green text-white shadow-lg shadow-agro-green/20" : "text-slate-500 hover:bg-slate-50"
-                )}
-              >
-                <PlusCircle size={20} />
-                <span className="font-medium">Lançamento Rápido</span>
-              </button>
-              <button 
-                onClick={() => { setActiveTab('fields'); setIsSidebarOpen(false); }}
-                className={cn(
-                  "w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all",
-                  activeTab === 'fields' ? "bg-agro-green text-white shadow-lg shadow-agro-green/20" : "text-slate-500 hover:bg-slate-50"
-                )}
-              >
-                <Layers size={20} />
-                <span className="font-medium">Safras & Talhões</span>
-              </button>
-              <button 
-                onClick={() => { setActiveTab('quotes'); setIsSidebarOpen(false); }}
-                className={cn(
-                  "w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all",
-                  activeTab === 'quotes' ? "bg-agro-green text-white shadow-lg shadow-agro-green/20" : "text-slate-500 hover:bg-slate-50"
-                )}
-              >
-                <TrendingUp size={20} />
-                <span className="font-medium">Cotações</span>
-              </button>
-              <button 
-                onClick={() => { setActiveTab('history'); setIsSidebarOpen(false); }}
-                className={cn(
-                  "w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all",
-                  activeTab === 'history' ? "bg-agro-green text-white shadow-lg shadow-agro-green/20" : "text-slate-500 hover:bg-slate-50"
-                )}
-              >
-                <History size={20} />
-                <span className="font-medium">Histórico</span>
-              </button>
-            </nav>
+      {/* Mobile Bottom Nav */}
+      <BottomNav
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        onMoreClick={() => setIsMoreSheetOpen(true)}
+      />
 
-            <div className="p-6 border-t border-slate-100">
-              {isTrial && (
-                <div 
-                  onClick={() => setShowSubscription(true)}
-                  className="bg-amber-50 rounded-2xl p-4 mb-4 border border-amber-100 cursor-pointer hover:bg-amber-100 transition-colors"
-                >
-                  <div className="flex items-center gap-2 text-amber-700 mb-1">
-                    <Calendar size={16} />
-                    <span className="text-xs font-bold uppercase tracking-wider">Período de Teste</span>
-                  </div>
-                  <p className="text-sm text-amber-800 font-medium">{daysLeft} dias restantes</p>
-                  <p className="text-[10px] text-amber-600 mt-1 underline">Assinar agora</p>
-                </div>
-              )}
-              <div className="flex items-center gap-3 px-2">
-                <div className="w-10 h-10 rounded-full bg-agro-earth flex items-center justify-center text-white font-bold">
-                  JP
-                </div>
-                <div className="flex-1 overflow-hidden">
-                  <p className="text-sm font-bold text-slate-900 truncate">João Produtor</p>
-                  <p className="text-xs text-slate-500 truncate">
-                    {fazendas.find(f => f.id === activeFazendaId)?.nome || "Fazenda não selecionada"}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </motion.aside>
-        )}
-      </AnimatePresence>
+      {/* Mobile More Sheet */}
+      <MoreSheet
+        isOpen={isMoreSheetOpen}
+        onClose={() => setIsMoreSheetOpen(false)}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        fazendas={fazendas}
+        activeFazendaId={activeFazendaId}
+        onFazendaChange={setActiveFazendaId}
+        isTrial={isTrial}
+        daysLeft={daysLeft}
+        onShowSubscription={() => setShowSubscription(true)}
+        userName="João Produtor"
+      />
 
       {/* Main Content */}
-      <main className="flex-1 p-4 md:p-8 overflow-y-auto">
+      <main className="flex-1 p-4 md:p-8 pb-20 md:pb-8 overflow-y-auto">
         <AnimatePresence mode="wait">
           {activeTab === 'dashboard' && (
             <motion.div 
