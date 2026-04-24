@@ -322,6 +322,21 @@ export default function App() {
     // Convert to hectares if input was in alqueires
     const areaHa = areaUnit === 'ha' ? area : area * 2.42;
 
+    const fazenda = fazendas.find(f => f.id === activeFazendaId);
+    if (fazenda) {
+      const currentSum = talhoes
+        .filter(t => t.fazenda_id === activeFazendaId)
+        .reduce((acc, t) => acc + t.area_ha, 0);
+      const newSum = currentSum + areaHa;
+      if (newSum > fazenda.hectares_totais) {
+        const excess = newSum - fazenda.hectares_totais;
+        const ok = window.confirm(
+          `A soma dos talhoes (${newSum.toFixed(2)} ha) vai exceder a area total da fazenda (${fazenda.hectares_totais.toFixed(2)} ha) em ${excess.toFixed(2)} ha. Continuar?`
+        );
+        if (!ok) return;
+      }
+    }
+
     const { data, error } = await supabase
       .from('talhoes')
       .insert({
@@ -374,6 +389,22 @@ export default function App() {
   const handleUpdateTalhao = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingTalhao) return;
+
+    const fazenda = fazendas.find(f => f.id === editingTalhao.fazenda_id);
+    if (fazenda) {
+      const original = talhoes.find(t => t.id === editingTalhao.id);
+      const currentSum = talhoes
+        .filter(t => t.fazenda_id === editingTalhao.fazenda_id)
+        .reduce((acc, t) => acc + t.area_ha, 0);
+      const newSum = currentSum - (original?.area_ha ?? 0) + editingTalhao.area_ha;
+      if (newSum > fazenda.hectares_totais) {
+        const excess = newSum - fazenda.hectares_totais;
+        const ok = window.confirm(
+          `A soma dos talhoes (${newSum.toFixed(2)} ha) vai exceder a area total da fazenda (${fazenda.hectares_totais.toFixed(2)} ha) em ${excess.toFixed(2)} ha. Continuar?`
+        );
+        if (!ok) return;
+      }
+    }
 
     const { data, error } = await supabase
       .from('talhoes')

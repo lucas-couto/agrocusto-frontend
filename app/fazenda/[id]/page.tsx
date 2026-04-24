@@ -382,6 +382,12 @@ export default function FazendaDetailPage({
     return talhoes.reduce((acc, t) => acc + t.area_ha * 2500, 0);
   }, [talhoes]);
 
+  const mappedArea = useMemo(
+    () => talhoes.reduce((acc, t) => acc + t.area_ha, 0),
+    [talhoes],
+  );
+  const pctMapped = totalArea > 0 ? (mappedArea / totalArea) * 100 : 0;
+
   // Cost per talhao (for table)
   const costByTalhao = useMemo(() => {
     const map = new Map<string, number>();
@@ -419,7 +425,18 @@ export default function FazendaDetailPage({
     } else if (field === 'localizacao') {
       updatePayload = { localizacao: rawValue };
     } else if (field === 'hectares_totais') {
-      updatePayload = { hectares_totais: parseFloat(rawValue) };
+      const nextTotal = parseFloat(rawValue);
+      if (isNaN(nextTotal) || nextTotal <= 0) {
+        alert('Informe uma area total maior que zero.');
+        return;
+      }
+      if (nextTotal < mappedArea) {
+        const ok = window.confirm(
+          `A soma dos talhoes (${mappedArea.toFixed(2)} ha) e maior que o novo total (${nextTotal.toFixed(2)} ha). Deseja salvar mesmo assim?`,
+        );
+        if (!ok) return;
+      }
+      updatePayload = { hectares_totais: nextTotal };
     }
 
     const { data, error } = await supabase
@@ -560,12 +577,46 @@ export default function FazendaDetailPage({
 
             {/* Stats Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <StatCard
-                title="Area total"
-                value={`${totalArea.toFixed(2)} ha`}
-                icon={MapPin}
-                colorClass="bg-agro-green"
-              />
+              <Card className="flex flex-col gap-1">
+                <div className="flex justify-between items-start">
+                  <div className="p-2 rounded-xl bg-agro-green">
+                    <MapPin size={20} className="text-white" />
+                  </div>
+                </div>
+                <p className="text-slate-500 text-sm mt-3">Area total</p>
+                <h3 className="text-2xl font-bold text-slate-900">
+                  {totalArea.toFixed(2)} ha
+                </h3>
+                {totalArea > 0 && (
+                  <>
+                    <p
+                      className={cn(
+                        'text-xs mt-1 font-medium',
+                        pctMapped > 100
+                          ? 'text-red-600'
+                          : pctMapped > 80
+                            ? 'text-amber-600'
+                            : 'text-slate-400',
+                      )}
+                    >
+                      {mappedArea.toFixed(2)} ha mapeados ({pctMapped.toFixed(0)}%)
+                    </p>
+                    <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mt-2">
+                      <div
+                        className={cn(
+                          'h-full rounded-full transition-all',
+                          pctMapped > 100
+                            ? 'bg-red-500'
+                            : pctMapped > 80
+                              ? 'bg-amber-500'
+                              : 'bg-agro-green',
+                        )}
+                        style={{ width: `${Math.min(pctMapped, 100)}%` }}
+                      />
+                    </div>
+                  </>
+                )}
+              </Card>
               <StatCard
                 title="N. Talhoes"
                 value={String(talhoesCount)}
