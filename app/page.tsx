@@ -265,6 +265,10 @@ export default function App() {
     }
 
     const value = parseFloat(launchValue);
+    if (isNaN(value) || value <= 0) {
+      alert('Informe um valor maior que zero antes de salvar.');
+      return;
+    }
     const categoria = labelToCategoria(aiResult?.categoria || 'Outros');
     const dataGasto = new Date().toISOString().split('T')[0];
 
