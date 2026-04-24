@@ -35,7 +35,7 @@ export function Sidebar({
   );
 
   return (
-    <aside className="hidden md:flex w-72 h-full bg-white border-r border-slate-200 flex-col">
+    <aside className="hidden md:flex w-72 md:min-h-screen md:sticky md:top-0 bg-white border-r border-slate-200 flex-col">
       <SidebarHeader />
 
       <nav className="flex-1 px-4 py-4 space-y-2">
