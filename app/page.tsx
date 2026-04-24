@@ -466,7 +466,7 @@ export default function App() {
   }, [talhoes, transactions, activeFazendaId]);
 
   return (
-    <div className="min-h-screen bg-agro-bg flex flex-col md:flex-row">
+    <div className="h-screen bg-agro-bg flex flex-col md:flex-row overflow-hidden">
       {/* Mobile Header */}
       <header className="md:hidden bg-agro-green text-white p-4 flex items-center sticky top-0 z-50 shadow-md">
         <div className="flex items-center gap-2">
