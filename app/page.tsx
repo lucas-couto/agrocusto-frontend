@@ -40,6 +40,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import { labelToCategoria, categoriaToLabel } from '@/lib/categoria';
+import { getBenchmark } from '@/lib/cultura-benchmarks';
 import { Lancamento, Talhao, Quote, AIResponse, SubscriptionPlan, Fazenda, CategoriaLancamento } from '@/types';
 import { Sidebar, BottomNav, MoreSheet } from '@/components/navigation';
 
@@ -501,11 +502,66 @@ export default function App() {
         .reduce((acc, curr) => acc + curr.valor_total, 0),
     }));
     const sedeCusto = transactions
-      .filter(l => l.talhao_id === null)
+      .filter(l => l.fazenda_id === activeFazendaId && l.talhao_id === null)
       .reduce((acc, curr) => acc + curr.valor_total, 0);
     if (sedeCusto > 0) items.push({ name: 'Sede', custo: sedeCusto });
     return items;
   }, [talhoes, transactions, activeFazendaId]);
+
+  // ---------- Dashboard stats (scoped to active fazenda) ----------
+  const fazendaTalhoes = useMemo(
+    () => talhoes.filter(t => t.fazenda_id === activeFazendaId),
+    [talhoes, activeFazendaId],
+  );
+
+  const gastosAtuais = useMemo(
+    () =>
+      transactions
+        .filter(l => l.fazenda_id === activeFazendaId)
+        .reduce((acc, l) => acc + l.valor_total, 0),
+    [transactions, activeFazendaId],
+  );
+
+  const receitaEstimada = useMemo(
+    () =>
+      fazendaTalhoes.reduce((acc, t) => {
+        const b = getBenchmark(t.cultura);
+        return acc + t.area_ha * b.produtividadeScHa * b.precoSc;
+      }, 0),
+    [fazendaTalhoes],
+  );
+
+  const lucroProjetado = receitaEstimada - gastosAtuais;
+
+  const fazendaTotalArea = useMemo(
+    () => fazendaTalhoes.reduce((acc, t) => acc + t.area_ha, 0),
+    [fazendaTalhoes],
+  );
+
+  const sacasEsperadas = useMemo(
+    () =>
+      fazendaTalhoes.reduce((acc, t) => {
+        const b = getBenchmark(t.cultura);
+        return acc + t.area_ha * b.produtividadeScHa;
+      }, 0),
+    [fazendaTalhoes],
+  );
+
+  const precoMedioSc = sacasEsperadas > 0 ? receitaEstimada / sacasEsperadas : 0;
+  const produtividadeMedia = fazendaTotalArea > 0 ? sacasEsperadas / fazendaTotalArea : 0;
+  const pontoEquilibrio =
+    fazendaTotalArea > 0 && precoMedioSc > 0
+      ? gastosAtuais / fazendaTotalArea / precoMedioSc
+      : 0;
+  const margemPct = receitaEstimada > 0 ? (lucroProjetado / receitaEstimada) * 100 : 0;
+  const pctOrcamento = receitaEstimada > 0 ? (gastosAtuais / receitaEstimada) * 100 : 0;
+
+  const unitSuffix = areaUnit === 'ha' ? 'ha' : 'alq';
+  const peUnit = areaUnit === 'ha' ? pontoEquilibrio : pontoEquilibrio * 2.42;
+  const metaUnit = areaUnit === 'ha' ? produtividadeMedia : produtividadeMedia * 2.42;
+
+  const fmtBRL = (n: number) =>
+    n.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
   return (
     <div className="h-screen bg-agro-bg flex flex-col md:flex-row overflow-hidden">
@@ -623,36 +679,36 @@ export default function App() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatCard 
-                  title="Lucro Projetado" 
-                  value="R$ 145.200" 
-                  subValue={`Baseado em 60 sc/${areaUnit === 'ha' ? 'ha' : 'alq'}`}
-                  icon={TrendingUp} 
+                <StatCard
+                  title="Lucro Projetado"
+                  value={`R$ ${fmtBRL(lucroProjetado)}`}
+                  subValue={receitaEstimada > 0 ? `Margem ${margemPct.toFixed(0)}%` : 'Sem receita estimada'}
+                  icon={TrendingUp}
                   colorClass="bg-agro-green"
-                  trend={12}
+                  trend={receitaEstimada > 0 ? Math.round(margemPct) : undefined}
                   onClick={() => { setReportType('profit'); setActiveTab('reports'); }}
                 />
-                <StatCard 
-                  title="Gastos Atuais" 
-                  value="R$ 82.450" 
-                  subValue="45% do orçamento"
-                  icon={Wallet} 
+                <StatCard
+                  title="Gastos Atuais"
+                  value={`R$ ${fmtBRL(gastosAtuais)}`}
+                  subValue={receitaEstimada > 0 ? `${pctOrcamento.toFixed(0)}% da receita estimada` : 'Sem receita estimada'}
+                  icon={Wallet}
                   colorClass="bg-agro-earth"
                   onClick={() => { setReportType('expenses'); setActiveTab('reports'); }}
                 />
-                <StatCard 
-                  title="Receita Estimada" 
-                  value="R$ 227.650" 
-                  subValue={`Preço: R$ 135/sc`}
-                  icon={DollarSign} 
+                <StatCard
+                  title="Receita Estimada"
+                  value={`R$ ${fmtBRL(receitaEstimada)}`}
+                  subValue={precoMedioSc > 0 ? `Preço médio: R$ ${precoMedioSc.toFixed(0)}/sc` : 'Defina cultura nos talhões'}
+                  icon={DollarSign}
                   colorClass="bg-agro-gold"
                   onClick={() => { setReportType('revenue'); setActiveTab('reports'); }}
                 />
-                <StatCard 
-                  title="Ponto de Equilíbrio" 
-                  value={`${areaUnit === 'ha' ? '42' : (42 * 2.42).toFixed(0)} sc/${areaUnit === 'ha' ? 'ha' : 'alq'}`}
-                  subValue={`Meta: ${areaUnit === 'ha' ? '60' : (60 * 2.42).toFixed(0)} sc/${areaUnit === 'ha' ? 'ha' : 'alq'}`}
-                  icon={Target} 
+                <StatCard
+                  title="Ponto de Equilíbrio"
+                  value={precoMedioSc > 0 ? `${peUnit.toFixed(1)} sc/${unitSuffix}` : '— sc/' + unitSuffix}
+                  subValue={produtividadeMedia > 0 ? `Meta: ${metaUnit.toFixed(0)} sc/${unitSuffix}` : 'Meta indisponível'}
+                  icon={Target}
                   colorClass="bg-blue-600"
                   onClick={() => { setReportType('break-even'); setActiveTab('reports'); }}
                 />
