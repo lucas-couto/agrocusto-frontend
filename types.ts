@@ -1,30 +1,37 @@
+import type { Database } from '@/lib/supabase/database.types';
+
+export type StatusAssinatura = Database['public']['Enums']['status_assinatura'];
+export type NivelAssinatura = Database['public']['Enums']['nivel_assinatura'];
+export type PrefUnidadeArea = Database['public']['Enums']['pref_unidade_area'];
+export type CategoriaLancamento = Database['public']['Enums']['categoria_lancamento'];
+
 export interface Usuario {
-  id: number;
+  id: string;
   nome: string;
   email: string;
-  telefone?: string;
+  telefone: string | null;
   data_cadastro: string;
-  status_assinatura: 'trial' | 'active' | 'blocked';
-  nivel_assinatura: 'basico' | 'normal' | 'platina';
-  pref_unidade_area: 'ha' | 'alqueire_sp' | 'alqueire_mg' | 'alqueire_ba'; // Added for regional units
-  id_indicador?: number;
+  status_assinatura: StatusAssinatura;
+  nivel_assinatura: NivelAssinatura;
+  pref_unidade_area: PrefUnidadeArea;
+  indicado_por: string | null;
 }
 
 export interface Fazenda {
-  id: number;
-  usuario_id: number;
+  id: string;
+  usuario_id: string;
   nome: string;
   hectares_totais: number;
-  localizacao?: string;
+  localizacao: string | null;
 }
 
 export interface Talhao {
-  id: number;
-  fazenda_id: number;
+  id: string;
+  fazenda_id: string;
   nome: string;
   area_ha: number;
   cultura: string;
-  data_plantio?: string;
+  data_plantio: string | null;
   safra: string;
 }
 
@@ -39,15 +46,15 @@ export interface SubscriptionPlan {
 }
 
 export interface Lancamento {
-  id: number;
-  usuario_id: number;
-  talhao_id: number | null; // null means "Fazenda Toda"
+  id: string;
+  usuario_id: string;
+  talhao_id: string | null; // null means "Fazenda Toda"
   categoria: string;
   valor_total: number;
   data_gasto: string;
   descricao: string;
-  cultura: string; // Added for explicit classification
-  safra: string;   // Added for explicit classification
+  cultura: string;
+  safra: string;
 }
 
 export interface Quote {
@@ -63,7 +70,7 @@ export interface Quote {
 export interface AIResponse {
   valor?: number;
   categoria?: string;
-  talhao_id?: number | null;
+  talhao_id?: string | null;
   descricao?: string;
   needsConfirmation: boolean;
   missingContext?: string;

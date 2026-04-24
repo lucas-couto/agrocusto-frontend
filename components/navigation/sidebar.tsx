@@ -11,8 +11,8 @@ type SidebarProps = {
   readonly activeTab: NavTab;
   readonly onTabChange: (tab: NavTab) => void;
   readonly fazendas: Fazenda[];
-  readonly activeFazendaId: number;
-  readonly onFazendaChange: (id: number) => void;
+  readonly activeFazendaId: string;
+  readonly onFazendaChange: (id: string) => void;
   readonly isTrial: boolean;
   readonly daysLeft: number;
   readonly onShowSubscription: () => void;

@@ -42,15 +42,17 @@ import { Lancamento, Talhao, Quote, AIResponse, SubscriptionPlan, Fazenda } from
 import { Sidebar, BottomNav, MoreSheet } from '@/components/navigation';
 
 // --- Mock Data ---
+const MOCK_USER_ID = 'u1';
+
 const MOCK_FAZENDAS: Fazenda[] = [
-  { id: 1, usuario_id: 1, nome: "Fazenda Boa Vista", hectares_totais: 150 },
-  { id: 2, usuario_id: 1, nome: "Fazenda Santa Fé", hectares_totais: 200 },
+  { id: 'f1', usuario_id: MOCK_USER_ID, nome: "Fazenda Boa Vista", hectares_totais: 150, localizacao: null },
+  { id: 'f2', usuario_id: MOCK_USER_ID, nome: "Fazenda Santa Fé", hectares_totais: 200, localizacao: null },
 ];
 
 const MOCK_TALHOES: Talhao[] = [
-  { id: 1, fazenda_id: 1, nome: "Talhão 01", area_ha: 50, cultura: "Soja", safra: "24/25" },
-  { id: 2, fazenda_id: 1, nome: "Talhão 02", area_ha: 35, cultura: "Milho", safra: "24/25" },
-  { id: 3, fazenda_id: 1, nome: "Talhão 03", area_ha: 20, cultura: "Trigo", safra: "24/25" },
+  { id: 't1', fazenda_id: 'f1', nome: "Talhão 01", area_ha: 50, cultura: "Soja", data_plantio: null, safra: "24/25" },
+  { id: 't2', fazenda_id: 'f1', nome: "Talhão 02", area_ha: 35, cultura: "Milho", data_plantio: null, safra: "24/25" },
+  { id: 't3', fazenda_id: 'f1', nome: "Talhão 03", area_ha: 20, cultura: "Trigo", data_plantio: null, safra: "24/25" },
 ];
 
 const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
@@ -84,9 +86,9 @@ const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
 ];
 
 const MOCK_LANCAMENTOS: Lancamento[] = [
-  { id: 1, usuario_id: 1, talhao_id: 1, categoria: "Semente", valor_total: 12500, data_gasto: "2024-03-15", descricao: "Semente Soja Premium", cultura: "Soja", safra: "24/25" },
-  { id: 2, usuario_id: 1, talhao_id: 2, categoria: "Diesel", valor_total: 4500, data_gasto: "2024-03-18", descricao: "Abastecimento Trator", cultura: "Milho", safra: "24/25" },
-  { id: 3, usuario_id: 1, talhao_id: null, categoria: "Manutenção", valor_total: 2000, data_gasto: "2024-03-20", descricao: "Reparo Cerca Sede", cultura: "Geral", safra: "24/25" },
+  { id: 'l1', usuario_id: MOCK_USER_ID, talhao_id: 't1', categoria: "Semente", valor_total: 12500, data_gasto: "2024-03-15", descricao: "Semente Soja Premium", cultura: "Soja", safra: "24/25" },
+  { id: 'l2', usuario_id: MOCK_USER_ID, talhao_id: 't2', categoria: "Diesel", valor_total: 4500, data_gasto: "2024-03-18", descricao: "Abastecimento Trator", cultura: "Milho", safra: "24/25" },
+  { id: 'l3', usuario_id: MOCK_USER_ID, talhao_id: null, categoria: "Manutenção", valor_total: 2000, data_gasto: "2024-03-20", descricao: "Reparo Cerca Sede", cultura: "Geral", safra: "24/25" },
 ];
 
 const CHART_DATA = [
@@ -132,7 +134,7 @@ const StatCard = ({ title, value, subValue, icon: Icon, colorClass, trend, onCli
 export default function App() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'launch' | 'fields' | 'quotes' | 'history' | 'reports'>('dashboard');
   const [reportType, setReportType] = useState<'profit' | 'expenses' | 'revenue' | 'break-even' | null>(null);
-  const [selectedReportTalhao, setSelectedReportTalhao] = useState<number | null>(null);
+  const [selectedReportTalhao, setSelectedReportTalhao] = useState<string | null>(null);
   const [editingTalhao, setEditingTalhao] = useState<Talhao | null>(null);
   const [areaUnit, setAreaUnit] = useState<'ha' | 'alqueire'>('ha');
   const [isMoreSheetOpen, setIsMoreSheetOpen] = useState(false);
@@ -147,7 +149,7 @@ export default function App() {
   const [subscriptionLevel, setSubscriptionLevel] = useState<'basico' | 'normal' | 'platina'>('normal');
 
   // Multi-farm State
-  const [activeFazendaId, setActiveFazendaId] = useState(1);
+  const [activeFazendaId, setActiveFazendaId] = useState<string>('f1');
   const [fazendas, setFazendas] = useState<Fazenda[]>(MOCK_FAZENDAS);
 
   // Quotes State
@@ -170,7 +172,7 @@ export default function App() {
   const [launchValue, setLaunchValue] = useState('');
   const [launchScope, setLaunchScope] = useState('Fazenda Toda');
   const [launchDesc, setLaunchDesc] = useState('');
-  const [launchTalhaoId, setLaunchTalhaoId] = useState<number | null>(null);
+  const [launchTalhaoId, setLaunchTalhaoId] = useState<string | null>(null);
   const [launchCultura, setLaunchCultura] = useState('');
   const [launchSafra, setLaunchSafra] = useState('24/25');
   const [userPhone, setUserPhone] = useState<string | null>(null);
@@ -262,9 +264,9 @@ export default function App() {
     // Handle multiple talhões division
     if (aiResult?.talhao_ids?.length > 1) {
       const dividedValue = value / aiResult.talhao_ids.length;
-      const newTransactions: Lancamento[] = aiResult.talhao_ids.map((tid: number, index: number) => ({
-        id: transactions.length + index + 1,
-        usuario_id: 1,
+      const newTransactions: Lancamento[] = aiResult.talhao_ids.map((tid: string, index: number) => ({
+        id: crypto.randomUUID(),
+        usuario_id: MOCK_USER_ID,
         talhao_id: tid,
         valor_total: dividedValue,
         categoria: aiResult.categoria || "Outros",
@@ -276,8 +278,8 @@ export default function App() {
       setTransactions([...newTransactions, ...transactions]);
     } else {
       const newTransaction: Lancamento = {
-        id: transactions.length + 1,
-        usuario_id: 1,
+        id: crypto.randomUUID(),
+        usuario_id: MOCK_USER_ID,
         talhao_id: launchTalhaoId,
         valor_total: value,
         categoria: aiResult?.categoria || "Outros",
@@ -306,11 +308,12 @@ export default function App() {
     const areaHa = areaUnit === 'ha' ? area : area * 2.42;
     
     const newField: Talhao = {
-      id: talhoes.length + 1,
+      id: crypto.randomUUID(),
       fazenda_id: activeFazendaId,
       nome: nome,
       area_ha: areaHa,
       cultura: cultura,
+      data_plantio: null,
       safra: "24/25"
     };
     setTalhoes([...talhoes, newField]);
@@ -330,7 +333,7 @@ export default function App() {
     const currentTalhoes = talhoes.filter(t => t.fazenda_id === activeFazendaId);
     const newTalhoes: Talhao[] = currentTalhoes.map(t => ({
       ...t,
-      id: talhoes.length + Math.random(), // Simple ID generation for mock
+      id: crypto.randomUUID(),
       safra: nextSafra
     }));
     setTalhoes([...talhoes, ...newTalhoes]);
@@ -422,7 +425,7 @@ export default function App() {
                     <MapPin size={16} />
                     <select 
                       value={activeFazendaId}
-                      onChange={(e) => setActiveFazendaId(parseInt(e.target.value))}
+                      onChange={(e) => setActiveFazendaId(e.target.value)}
                       className="bg-transparent border-none outline-none font-medium text-agro-green cursor-pointer"
                     >
                       {fazendas.map(f => (
@@ -693,7 +696,7 @@ export default function App() {
                         <select 
                           value={launchTalhaoId || ''}
                           onChange={(e) => {
-                            const id = parseInt(e.target.value);
+                            const id = e.target.value;
                             setLaunchTalhaoId(id);
                             setLaunchScope(`Talhão ${id}`);
                           }}

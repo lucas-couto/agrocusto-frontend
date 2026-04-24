@@ -5,8 +5,8 @@ import type { Fazenda } from '@/types';
 
 type UserFooterProps = {
   readonly fazendas: Fazenda[];
-  readonly activeFazendaId: number;
-  readonly onFazendaChange: (id: number) => void;
+  readonly activeFazendaId: string;
+  readonly onFazendaChange: (id: string) => void;
   readonly isTrial: boolean;
   readonly daysLeft: number;
   readonly onShowSubscription: () => void;
@@ -45,7 +45,7 @@ export function UserFooter({
           <p className="text-sm font-bold text-slate-900 truncate">{userName}</p>
           <select
             value={activeFazendaId}
-            onChange={(e) => onFazendaChange(parseInt(e.target.value, 10))}
+            onChange={(e) => onFazendaChange(e.target.value)}
             className="text-xs text-slate-500 truncate bg-transparent border-none outline-none cursor-pointer w-full p-0"
           >
             {fazendas.map((f) => (
