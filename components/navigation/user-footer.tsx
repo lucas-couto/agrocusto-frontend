@@ -1,6 +1,7 @@
 'use client';
 
-import { Calendar } from 'lucide-react';
+import { Calendar, LogOut } from 'lucide-react';
+import { signOut } from '@/app/actions/auth';
 import type { Fazenda } from '@/types';
 
 type UserFooterProps = {
@@ -55,6 +56,15 @@ export function UserFooter({
             ))}
           </select>
         </div>
+        <form action={signOut}>
+          <button
+            type="submit"
+            aria-label="Sair"
+            className="p-2 rounded-lg text-slate-400 hover:text-agro-green hover:bg-agro-green/5 transition-colors"
+          >
+            <LogOut size={18} />
+          </button>
+        </form>
       </div>
     </div>
   );
