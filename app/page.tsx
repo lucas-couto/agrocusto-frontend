@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   PlusCircle,
   TrendingUp,
@@ -38,22 +38,10 @@ import {
 } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/lib/utils';
-import { Lancamento, Talhao, Quote, AIResponse, SubscriptionPlan, Fazenda } from '@/types';
+import { createClient } from '@/lib/supabase/client';
+import { labelToCategoria, categoriaToLabel } from '@/lib/categoria';
+import { Lancamento, Talhao, Quote, AIResponse, SubscriptionPlan, Fazenda, CategoriaLancamento } from '@/types';
 import { Sidebar, BottomNav, MoreSheet } from '@/components/navigation';
-
-// --- Mock Data ---
-const MOCK_USER_ID = 'u1';
-
-const MOCK_FAZENDAS: Fazenda[] = [
-  { id: 'f1', usuario_id: MOCK_USER_ID, nome: "Fazenda Boa Vista", hectares_totais: 150, localizacao: null },
-  { id: 'f2', usuario_id: MOCK_USER_ID, nome: "Fazenda Santa Fé", hectares_totais: 200, localizacao: null },
-];
-
-const MOCK_TALHOES: Talhao[] = [
-  { id: 't1', fazenda_id: 'f1', nome: "Talhão 01", area_ha: 50, cultura: "Soja", data_plantio: null, safra: "24/25" },
-  { id: 't2', fazenda_id: 'f1', nome: "Talhão 02", area_ha: 35, cultura: "Milho", data_plantio: null, safra: "24/25" },
-  { id: 't3', fazenda_id: 'f1', nome: "Talhão 03", area_ha: 20, cultura: "Trigo", data_plantio: null, safra: "24/25" },
-];
 
 const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   { 
@@ -83,19 +71,6 @@ const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     whatsapp_included: true,
     multi_farm: true
   },
-];
-
-const MOCK_LANCAMENTOS: Lancamento[] = [
-  { id: 'l1', usuario_id: MOCK_USER_ID, talhao_id: 't1', categoria: "Semente", valor_total: 12500, data_gasto: "2024-03-15", descricao: "Semente Soja Premium", cultura: "Soja", safra: "24/25" },
-  { id: 'l2', usuario_id: MOCK_USER_ID, talhao_id: 't2', categoria: "Diesel", valor_total: 4500, data_gasto: "2024-03-18", descricao: "Abastecimento Trator", cultura: "Milho", safra: "24/25" },
-  { id: 'l3', usuario_id: MOCK_USER_ID, talhao_id: null, categoria: "Manutenção", valor_total: 2000, data_gasto: "2024-03-20", descricao: "Reparo Cerca Sede", cultura: "Geral", safra: "24/25" },
-];
-
-const CHART_DATA = [
-  { name: 'Talhão 01', custo: 12500 },
-  { name: 'Talhão 02', custo: 4500 },
-  { name: 'Talhão 03', custo: 0 },
-  { name: 'Sede', custo: 2000 },
 ];
 
 // --- Components ---
@@ -132,6 +107,11 @@ const StatCard = ({ title, value, subValue, icon: Icon, colorClass, trend, onCli
 // --- Main App Component ---
 
 export default function App() {
+  const supabase = useMemo(() => createClient(), []);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [showCreateFazendaModal, setShowCreateFazendaModal] = useState(false);
+
   const [activeTab, setActiveTab] = useState<'dashboard' | 'launch' | 'fields' | 'quotes' | 'history' | 'reports'>('dashboard');
   const [reportType, setReportType] = useState<'profit' | 'expenses' | 'revenue' | 'break-even' | null>(null);
   const [selectedReportTalhao, setSelectedReportTalhao] = useState<string | null>(null);
@@ -149,8 +129,8 @@ export default function App() {
   const [subscriptionLevel, setSubscriptionLevel] = useState<'basico' | 'normal' | 'platina'>('normal');
 
   // Multi-farm State
-  const [activeFazendaId, setActiveFazendaId] = useState<string>('f1');
-  const [fazendas, setFazendas] = useState<Fazenda[]>(MOCK_FAZENDAS);
+  const [activeFazendaId, setActiveFazendaId] = useState<string>('');
+  const [fazendas, setFazendas] = useState<Fazenda[]>([]);
 
   // Quotes State
   const [quotes, setQuotes] = useState<Quote[]>([]);
@@ -179,8 +159,32 @@ export default function App() {
   const [isPhoneVerified, setIsPhoneVerified] = useState(false);
 
   // Transactions State
-  const [transactions, setTransactions] = useState<Lancamento[]>(MOCK_LANCAMENTOS);
-  const [talhoes, setTalhoes] = useState<Talhao[]>(MOCK_TALHOES);
+  const [transactions, setTransactions] = useState<Lancamento[]>([]);
+  const [talhoes, setTalhoes] = useState<Talhao[]>([]);
+
+  // Fetch initial data from Supabase
+  useEffect(() => {
+    async function load() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      setUserId(user.id);
+
+      const fazRes = await supabase.from('fazendas').select('*').order('nome');
+      const talRes = await supabase.from('talhoes').select('*').order('nome');
+      const lanRes = await supabase.from('lancamentos').select('*').order('data_gasto', { ascending: false });
+
+      const fazendaRows = fazRes.data ?? [];
+      const talhaoRows = talRes.data ?? [];
+      const lancamentoRows = lanRes.data ?? [];
+
+      setFazendas(fazendaRows);
+      if (fazendaRows.length > 0) setActiveFazendaId(fazendaRows[0].id);
+      setTalhoes(talhaoRows);
+      setTransactions(lancamentoRows);
+      setIsLoading(false);
+    }
+    load();
+  }, [supabase]);
 
   useEffect(() => {
     if (activeTab === 'quotes') {
@@ -250,9 +254,10 @@ export default function App() {
     }
   };
 
-  const handleLaunch = (e?: React.FormEvent) => {
+  const handleLaunch = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    
+    if (!userId) return;
+
     // If field doesn't exist, we should block or ask to create
     if (aiResult?.talhao_nomes?.length > 0 && !aiResult.fieldExists) {
       setShowCreateFieldModal(true);
@@ -260,39 +265,45 @@ export default function App() {
     }
 
     const value = parseFloat(launchValue);
-    
-    // Handle multiple talhões division
+    const categoria = labelToCategoria(aiResult?.categoria || 'Outros');
+    const dataGasto = new Date().toISOString().split('T')[0];
+
+    // Handle multiple talhoes division
     if (aiResult?.talhao_ids?.length > 1) {
       const dividedValue = value / aiResult.talhao_ids.length;
-      const newTransactions: Lancamento[] = aiResult.talhao_ids.map((tid: string, index: number) => ({
-        id: crypto.randomUUID(),
-        usuario_id: MOCK_USER_ID,
+      const rows = aiResult.talhao_ids.map((tid: string, index: number) => ({
+        usuario_id: userId,
         talhao_id: tid,
         valor_total: dividedValue,
-        categoria: aiResult.categoria || "Outros",
-        data_gasto: new Date().toISOString().split('T')[0],
+        categoria,
+        data_gasto: dataGasto,
         descricao: `${launchDesc} (Rateio ${index + 1}/${aiResult.talhao_ids.length})`,
-        cultura: launchCultura || "Geral",
-        safra: launchSafra
+        cultura: launchCultura || 'Geral',
+        safra: launchSafra,
       }));
-      setTransactions([...newTransactions, ...transactions]);
+
+      const { data, error } = await supabase.from('lancamentos').insert(rows).select();
+      if (error) { alert('Erro ao salvar lancamentos: ' + error.message); return; }
+      if (data) setTransactions([...data, ...transactions]);
     } else {
-      const newTransaction: Lancamento = {
-        id: crypto.randomUUID(),
-        usuario_id: MOCK_USER_ID,
+      const row = {
+        usuario_id: userId,
         talhao_id: launchTalhaoId,
         valor_total: value,
-        categoria: aiResult?.categoria || "Outros",
-        data_gasto: new Date().toISOString().split('T')[0],
+        categoria,
+        data_gasto: dataGasto,
         descricao: launchDesc,
-        cultura: launchCultura || "Geral",
-        safra: launchSafra
+        cultura: launchCultura || 'Geral',
+        safra: launchSafra,
       };
-      setTransactions([newTransaction, ...transactions]);
+
+      const { data, error } = await supabase.from('lancamentos').insert(row).select().single();
+      if (error) { alert('Erro ao salvar lancamento: ' + error.message); return; }
+      if (data) setTransactions([data, ...transactions]);
     }
-    
-    alert(`Lançamento salvo com sucesso!`);
-    
+
+    alert('Lancamento salvo com sucesso!');
+
     setLaunchValue('');
     setLaunchDesc('');
     setLaunchTalhaoId(null);
@@ -303,50 +314,79 @@ export default function App() {
     setActiveTab('dashboard');
   };
 
-  const handleCreateField = (nome: string, area: number, cultura: string) => {
+  const handleCreateField = async (nome: string, area: number, cultura: string) => {
     // Convert to hectares if input was in alqueires
     const areaHa = areaUnit === 'ha' ? area : area * 2.42;
-    
-    const newField: Talhao = {
-      id: crypto.randomUUID(),
-      fazenda_id: activeFazendaId,
-      nome: nome,
-      area_ha: areaHa,
-      cultura: cultura,
-      data_plantio: null,
-      safra: "24/25"
-    };
-    setTalhoes([...talhoes, newField]);
-    setLaunchTalhaoId(newField.id);
-    setLaunchScope(`Talhão ${newField.id}`);
+
+    const { data, error } = await supabase
+      .from('talhoes')
+      .insert({
+        fazenda_id: activeFazendaId,
+        nome,
+        area_ha: areaHa,
+        cultura,
+        safra: '24/25',
+      })
+      .select()
+      .single();
+
+    if (error) { alert('Erro ao criar talhao: ' + error.message); return; }
+    if (!data) return;
+
+    setTalhoes([...talhoes, data]);
+    setLaunchTalhaoId(data.id);
+    setLaunchScope(`Talhao ${data.id}`);
     setLaunchCultura(cultura);
     setShowCreateFieldModal(false);
-    
+
     // Resume launch with the new field
     setTimeout(() => {
       handleLaunch();
     }, 100);
   };
 
-  const handleRepeatSafra = () => {
-    const nextSafra = "25/26";
+  const handleRepeatSafra = async () => {
+    const nextSafra = '25/26';
     const currentTalhoes = talhoes.filter(t => t.fazenda_id === activeFazendaId);
-    const newTalhoes: Talhao[] = currentTalhoes.map(t => ({
-      ...t,
-      id: crypto.randomUUID(),
-      safra: nextSafra
+    if (currentTalhoes.length === 0) {
+      alert('Nenhum talhao encontrado para repetir.');
+      return;
+    }
+
+    const newRows = currentTalhoes.map(t => ({
+      fazenda_id: t.fazenda_id,
+      nome: t.nome,
+      area_ha: t.area_ha,
+      cultura: t.cultura,
+      safra: nextSafra,
     }));
-    setTalhoes([...talhoes, ...newTalhoes]);
-    alert(`Estrutura física repetida para a safra ${nextSafra}!`);
+
+    const { data, error } = await supabase.from('talhoes').insert(newRows).select();
+    if (error) { alert('Erro ao repetir safra: ' + error.message); return; }
+    if (data) setTalhoes([...talhoes, ...data]);
+    alert(`Estrutura fisica repetida para a safra ${nextSafra}!`);
   };
 
-  const handleUpdateTalhao = (e: React.FormEvent) => {
+  const handleUpdateTalhao = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingTalhao) return;
-    
-    setTalhoes(talhoes.map(t => t.id === editingTalhao.id ? editingTalhao : t));
+
+    const { data, error } = await supabase
+      .from('talhoes')
+      .update({
+        nome: editingTalhao.nome,
+        area_ha: editingTalhao.area_ha,
+        cultura: editingTalhao.cultura,
+        safra: editingTalhao.safra,
+      })
+      .eq('id', editingTalhao.id)
+      .select()
+      .single();
+
+    if (error) { alert('Erro ao atualizar talhao: ' + error.message); return; }
+    if (data) setTalhoes(talhoes.map(t => t.id === data.id ? data : t));
     setEditingTalhao(null);
-    alert("Talhão atualizado com sucesso!");
+    alert('Talhao atualizado com sucesso!');
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -359,6 +399,36 @@ export default function App() {
       reader.readAsDataURL(file);
     }
   };
+
+  const handleCreateFazenda = async (nome: string, hectares: number, localizacao: string | null) => {
+    if (!userId) return;
+    const { data, error } = await supabase
+      .from('fazendas')
+      .insert({ usuario_id: userId, nome, hectares_totais: hectares, localizacao })
+      .select()
+      .single();
+    if (error) { alert('Erro ao criar fazenda: ' + error.message); return; }
+    if (!data) return;
+    setFazendas([...fazendas, data]);
+    setActiveFazendaId(data.id);
+    setShowCreateFazendaModal(false);
+  };
+
+  // Compute chart data from real transactions
+  const chartData = useMemo(() => {
+    const fieldTalhoes = talhoes.filter(t => t.fazenda_id === activeFazendaId);
+    const items = fieldTalhoes.map(t => ({
+      name: t.nome,
+      custo: transactions
+        .filter(l => l.talhao_id === t.id)
+        .reduce((acc, curr) => acc + curr.valor_total, 0),
+    }));
+    const sedeCusto = transactions
+      .filter(l => l.talhao_id === null)
+      .reduce((acc, curr) => acc + curr.valor_total, 0);
+    if (sedeCusto > 0) items.push({ name: 'Sede', custo: sedeCusto });
+    return items;
+  }, [talhoes, transactions, activeFazendaId]);
 
   return (
     <div className="min-h-screen bg-agro-bg flex flex-col md:flex-row">
@@ -409,7 +479,29 @@ export default function App() {
 
       {/* Main Content */}
       <main className="flex-1 p-4 md:p-8 pb-20 md:pb-8 overflow-y-auto">
-        <AnimatePresence mode="wait">
+        {isLoading && (
+          <div className="max-w-md mx-auto mt-20 text-center text-slate-400">
+            Carregando...
+          </div>
+        )}
+
+        {!isLoading && fazendas.length === 0 && (
+          <div className="max-w-md mx-auto mt-20 text-center space-y-4">
+            <div className="w-16 h-16 bg-agro-green/10 text-agro-green rounded-full flex items-center justify-center mx-auto">
+              <MapPin size={32} />
+            </div>
+            <h2 className="text-2xl font-bold text-slate-900">Crie sua primeira fazenda</h2>
+            <p className="text-slate-500">Voce precisa cadastrar uma fazenda antes de comecar a registrar custos.</p>
+            <button
+              onClick={() => setShowCreateFazendaModal(true)}
+              className="bg-agro-green text-white px-8 py-4 rounded-2xl font-bold shadow-lg shadow-agro-green/20 hover:bg-agro-green/90 transition-all"
+            >
+              CRIAR FAZENDA
+            </button>
+          </div>
+        )}
+
+        {fazendas.length > 0 && <AnimatePresence mode="wait">
           {activeTab === 'dashboard' && (
             <motion.div 
               key="dashboard"
@@ -497,7 +589,7 @@ export default function App() {
                   </h3>
                   <div className="h-[300px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={CHART_DATA}>
+                      <BarChart data={chartData}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                         <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
                         <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
@@ -506,8 +598,8 @@ export default function App() {
                           contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}}
                         />
                         <Bar dataKey="custo" radius={[6, 6, 0, 0]}>
-                          {CHART_DATA.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={index === 3 ? '#5D4037' : '#2E7D32'} />
+                          {chartData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.name === 'Sede' ? '#5D4037' : '#2E7D32'} />
                           ))}
                         </Bar>
                       </BarChart>
@@ -521,11 +613,11 @@ export default function App() {
                     {transactions.slice(0, 5).map((item) => (
                       <div key={item.id} className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100">
                         <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 shrink-0">
-                          {item.categoria[0]}
+                          {categoriaToLabel(item.categoria as CategoriaLancamento)[0]}
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-bold text-slate-900 truncate">{item.descricao}</p>
-                          <p className="text-xs text-slate-500">{item.categoria} • {item.data_gasto}</p>
+                          <p className="text-xs text-slate-500">{categoriaToLabel(item.categoria as CategoriaLancamento)} • {item.data_gasto}</p>
                         </div>
                         <div className="text-right shrink-0">
                           <p className="text-sm font-bold text-red-600">- R$ {item.valor_total.toLocaleString()}</p>
@@ -708,7 +800,7 @@ export default function App() {
                           )}
                         >
                           <option value="" disabled className="text-slate-900">Selecionar Talhão</option>
-                          {MOCK_TALHOES.map(t => (
+                          {talhoes.filter(t => t.fazenda_id === activeFazendaId).map(t => (
                             <option key={t.id} value={t.id} className="text-slate-900">{t.nome} ({t.cultura})</option>
                           ))}
                         </select>
@@ -995,11 +1087,11 @@ export default function App() {
                           <td className="px-6 py-4 text-sm font-bold text-slate-900">{item.descricao}</td>
                           <td className="px-6 py-4 text-sm">
                             <span className="px-2 py-1 bg-slate-100 text-slate-600 rounded-md text-xs font-medium">
-                              {item.categoria}
+                              {categoriaToLabel(item.categoria as CategoriaLancamento)}
                             </span>
                           </td>
                           <td className="px-6 py-4 text-sm text-slate-600">
-                            {item.talhao_id ? `Talhão ${item.talhao_id}` : 'Fazenda Toda'}
+                            {item.talhao_id ? talhoes.find(t => t.id === item.talhao_id)?.nome ?? item.talhao_id : 'Fazenda Toda'}
                           </td>
                           <td className="px-6 py-4 text-sm font-bold text-red-600 text-right">
                             - R$ {item.valor_total.toLocaleString()}
@@ -1180,7 +1272,7 @@ export default function App() {
                               <td className="px-6 py-4 text-sm font-bold text-slate-900">{item.descricao}</td>
                               <td className="px-6 py-4 text-sm">
                                 <span className="px-2 py-1 bg-slate-100 text-slate-600 rounded-md text-xs font-medium">
-                                  {item.categoria}
+                                  {categoriaToLabel(item.categoria as CategoriaLancamento)}
                                 </span>
                               </td>
                               <td className="px-6 py-4 text-sm font-bold text-red-600 text-right">
@@ -1202,8 +1294,91 @@ export default function App() {
               )}
             </motion.div>
           )}
-        </AnimatePresence>
+        </AnimatePresence>}
       </main>
+
+      {/* Create Fazenda Modal */}
+      <AnimatePresence>
+        {showCreateFazendaModal && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowCreateFazendaModal(false)}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md p-8"
+            >
+              <h3 className="text-2xl font-bold text-slate-900 mb-6">Nova Fazenda</h3>
+
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const form = e.currentTarget;
+                  const nome = (form.elements.namedItem('fazenda-nome') as HTMLInputElement).value;
+                  const hectares = parseFloat((form.elements.namedItem('fazenda-hectares') as HTMLInputElement).value);
+                  const loc = (form.elements.namedItem('fazenda-localizacao') as HTMLInputElement).value.trim();
+                  handleCreateFazenda(nome, hectares, loc || null);
+                }}
+                className="space-y-4"
+              >
+                <div>
+                  <label className="text-xs font-bold text-slate-400 uppercase">Nome</label>
+                  <input
+                    type="text"
+                    name="fazenda-nome"
+                    required
+                    placeholder="Ex: Fazenda Boa Vista"
+                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-agro-green"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-400 uppercase">Hectares Totais</label>
+                  <input
+                    type="number"
+                    name="fazenda-hectares"
+                    required
+                    step="0.01"
+                    min="0"
+                    placeholder="Ex: 150"
+                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-agro-green"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-400 uppercase">Localizacao (opcional)</label>
+                  <input
+                    type="text"
+                    name="fazenda-localizacao"
+                    placeholder="Ex: Cidade, Estado"
+                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-agro-green"
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateFazendaModal(false)}
+                    className="flex-1 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold text-sm"
+                  >
+                    CANCELAR
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-3 bg-agro-green text-white rounded-xl font-bold text-sm shadow-lg shadow-agro-green/20"
+                  >
+                    CRIAR
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Subscription Modal */}
       <AnimatePresence>
