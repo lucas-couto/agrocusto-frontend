@@ -43,6 +43,7 @@ export type Database = {
           pref_unidade_area?: Database['public']['Enums']['pref_unidade_area'];
           indicado_por?: string | null;
         };
+        Relationships: [];
       };
       fazendas: {
         Row: {
@@ -69,6 +70,7 @@ export type Database = {
           localizacao?: string | null;
           created_at?: string;
         };
+        Relationships: [];
       };
       talhoes: {
         Row: {
@@ -101,6 +103,7 @@ export type Database = {
           safra?: string;
           created_at?: string;
         };
+        Relationships: [];
       };
       lancamentos: {
         Row: {
@@ -139,7 +142,14 @@ export type Database = {
           safra?: string;
           created_at?: string;
         };
+        Relationships: [];
       };
+    };
+    Views: {
+      [_ in never]: never;
+    };
+    Functions: {
+      [_ in never]: never;
     };
     Enums: {
       status_assinatura: 'trial' | 'active' | 'blocked';
@@ -152,6 +162,9 @@ export type Database = {
         | 'mao_de_obra'
         | 'manutencao'
         | 'outros';
+    };
+    CompositeTypes: {
+      [_ in never]: never;
     };
   };
 };
